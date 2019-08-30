@@ -73,16 +73,16 @@ void timed_step() {
 
     TMR0 = TMR0_PWM_VAL0; // preset for timer register
     if (state == main_low)
-        GPIO = 0xFF;
-    else if (state == main_med)
         GPIO = ~(1 << OUT_XML);
+    else if (state == main_med)
+        GPIO = 0xFF;
     while (TMR0 >= TMR0_PWM_VAL0);
 
     TMR0 = TMR0_PWM_VAL1;
     if (state == main_low)
-        GPIO = ~(1 << OUT_XML);
-    else if (state == main_med)
         GPIO = 0xFF;
+    else if (state == main_med)
+        GPIO = ~(1 << OUT_XML);
 
     if (!IN_BTN_GP) {
         if (btn_buf < BTN_BUF_DELAY_CNT)
