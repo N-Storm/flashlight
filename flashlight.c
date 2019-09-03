@@ -8,11 +8,11 @@
 #pragma config CP = OFF         // Code Protect (Code protection off)
 #pragma config MCLRE = OFF      // Master Clear Enable (GP3/MCLR pin fuction is digital I/O, MCLR internally tied to VDD)
 
-#define OUT_WHITE 1 // GP1 / Pin3
-#define OUT_RED 0 // GP0 / Pin1
-#define OUT_XML 3 // GP3 / Pin6
-#define IN_BTN 2 // GP2 / Pin4
-#define IN_BTN_GP GP2
+#define OUT_WHITE 0 // GP0
+#define OUT_RED 1 // GP1
+#define OUT_XML 2 // GP2
+#define IN_BTN 3 // GP3
+#define IN_BTN_GP GP3
 
 //Timer0 Registers Prescaler = 64 - TMR0 Preset = 230 - Freq = 600.96 Hz - Period = 0.001664 seconds
 // Soft PWM preload values for timer, affects PWM frequency
