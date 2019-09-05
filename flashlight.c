@@ -28,6 +28,8 @@
 #define BTN_BUF_DELAY_CNT (const uint16_t)(0.6/0.001664)
 #define BTN_BUF_DEBOUNCE_CNT 10
 
+#define RED_PULSE_DELAY (const uint16_t)(0.5/0.001664)
+
 #include <xc.h>
 #include <stdint.h>        /* For uint8_t definition */
 #include <stdbool.h>       /* For true/false definition */
@@ -35,8 +37,13 @@
 
 #define _XTAL_FREQ 4000000 // 4 MHz INTOSC
 
-typedef enum {bounce, short_press, long_press} buttons_t;
-typedef enum {power_on, sleep, wake, main_high, main_med, main_low, aux_white, aux_red} state_t;
+typedef enum {
+    bounce, short_press, long_press
+} buttons_t;
+
+typedef enum {
+    power_on, sleep, wake, main_high, main_med, main_low, aux_white, aux_red, aux_red_pulse
+} state_t;
 
 typedef struct {
     state_t main;
@@ -44,11 +51,12 @@ typedef struct {
 } settings_t;
 
 // Global vars
-state_t state;
-settings_t settings  __at(0x1A);
-buttons_t btn = bounce;
+state_t state __at(0x14);
+buttons_t btn __at(0x15);
+uint16_t btn_buf __at(0x16), red_pulse_cnt __at(0x18);
+settings_t settings __at(0x1A);
 
-inline void init() {
+void main(void) {
     OPTION = ~(nGPWU | T0CS | PSA | PS1); // GPWU (wake-up on GP change) enabled, T0 = internal clock, Fosc/4, Prescaler assigned to TMR0, 1:64 prescaler
     if (!GPWUF && (nPD || __powerdown)) { // 1st power on (i.e. not waking from sleep mode)
         GPIO = (1 << OUT_WHITE) | (1 << OUT_RED) | (1 << OUT_XML); // Start with every output at HIGH
@@ -56,120 +64,115 @@ inline void init() {
     } else
         state = wake;
     TRIS = (1 << IN_BTN); // IN_BTN = INPUT, reset = OUTPUT
-}
-
-// Prepartion before going to SLEEP mode
-void enter_sleep() {
-    GPIO = 0xFF; // Turn off any GPIO
-    state = sleep;    
-    if (GPIO); // Dummy-read GPIO before going to sleep
-    GPWUF = 0; // Reset the GPWUF flag
-    while (true)
-        SLEEP();
-}
-
-void timed_step() {
-    static uint16_t btn_buf;
-
-    TMR0 = TMR0_PWM_VAL0; // preset for timer register
-    if (state == main_low)
-        GPIO = ~(1 << OUT_XML);
-    else if (state == main_med)
-        GPIO = 0xFF;
-    while (TMR0 >= TMR0_PWM_VAL0);
-
-    TMR0 = TMR0_PWM_VAL1;
-    if (state == main_low)
-        GPIO = 0xFF;
-    else if (state == main_med)
-        GPIO = ~(1 << OUT_XML);
-
-    if (!IN_BTN_GP) {
-        if (btn_buf < BTN_BUF_DELAY_CNT)
-            btn_buf++;
-    } else {
-        if (btn_buf <= BTN_BUF_DEBOUNCE_CNT)
-            btn = bounce;
-        else if (btn_buf >= BTN_BUF_DELAY_CNT)
-            btn = long_press;
-        else
-            btn = short_press;
-        btn_buf = 0; // reset counter when button are not pressed
-    }
-
-    while (TMR0 >= TMR0_PWM_VAL1);
-}
-
-void fsm_routine() {
-    switch (state) {
-        case power_on:
-            settings.aux = aux_white;
-            settings.main = main_low;
-            if (btn == short_press)
-                state = main_low;
-            else if (btn == long_press)
-                state = aux_white;
-            break;
-        case wake:
-            if (btn == short_press)
-                state = settings.main;
-            else if (btn == long_press)
-                state = settings.aux;
-            break;
-        case main_low:
-            if (btn == short_press)
-                state = sleep;
-            else if (btn == long_press) {
-                state = main_med;
-                settings.main = state;
-            }
-            break;
-        case main_med:
-            if (btn == short_press)
-                state = sleep;
-            else if (btn == long_press) {
-                state = main_high;
-                settings.main = state;
-            }
-            break;
-        case main_high:
-            GPIO = ~(1 << OUT_XML);
-            if (btn == short_press)
-                state = sleep;
-            else if (btn == long_press) {
-                state = main_low;
-                settings.main = state;
-            }
-            break;
-        case aux_white:
-            GPIO = ~(1 << OUT_WHITE);
-            if (btn == short_press)
-                state = sleep;
-            else if (btn == long_press) {
-                state = aux_red;
-                settings.aux = state;
-            }
-            break;
-        case aux_red:
-            GPIO = ~(1 << OUT_RED);
-            if (btn == short_press)
-                state = sleep;
-            else if (btn == long_press) {
-                state = aux_white;
-                settings.aux = state;
-            }
-            break;
-        case sleep:
-            enter_sleep();
-            break;
-    }
-}
-
-void main(void) {
-    init();
 
     while (true) { // main loop
-        timed_step();
-        fsm_routine();
+        TMR0 = TMR0_PWM_VAL0; // preset for timer register
+        if (state == main_low)
+            GPIO = ~(1 << OUT_XML);
+        else if (state == main_med)
+            GPIO = 0xFF;
+        while (TMR0 >= TMR0_PWM_VAL0);
+
+        TMR0 = TMR0_PWM_VAL1;
+        if (state == main_low)
+            GPIO = 0xFF;
+        else if (state == main_med)
+            GPIO = ~(1 << OUT_XML);
+
+        if (!IN_BTN_GP) {
+            if (btn_buf >> 8 <= (BTN_BUF_DELAY_CNT >> 8))
+                btn_buf++;
+        } else {
+            if (btn_buf <= BTN_BUF_DEBOUNCE_CNT)
+                btn = bounce;
+            else if (btn_buf >= BTN_BUF_DELAY_CNT)
+                btn = long_press;
+            else
+                btn = short_press;
+            btn_buf = 0; // reset counter when button are not pressed
+        }
+
+        while (TMR0 >= TMR0_PWM_VAL1);
+        red_pulse_cnt++;
+
+        switch (state) {
+            case power_on:
+                settings.aux = aux_white;
+                settings.main = main_low;
+                if (btn == short_press)
+                    state = main_low;
+                else if (btn == long_press)
+                    state = aux_white;
+                break;
+            case wake:
+                if (btn == short_press)
+                    state = settings.main;
+                else if (btn == long_press)
+                    state = settings.aux;
+                break;
+            case main_low:
+                if (btn == short_press)
+                    state = sleep;
+                else if (btn == long_press) {
+                    state = main_med;
+                    settings.main = state;
+                }
+                break;
+            case main_med:
+                if (btn == short_press)
+                    state = sleep;
+                else if (btn == long_press) {
+                    state = main_high;
+                    settings.main = state;
+                }
+                break;
+            case main_high:
+                GPIO = ~(1 << OUT_XML);
+                if (btn == short_press)
+                    state = sleep;
+                else if (btn == long_press) {
+                    state = main_low;
+                    settings.main = state;
+                }
+                break;
+            case aux_white:
+                GPIO = ~(1 << OUT_WHITE);
+                if (btn == short_press)
+                    state = sleep;
+                else if (btn == long_press) {
+                    state = aux_red;
+                    settings.aux = state;
+                }
+                break;
+            case aux_red:
+                GPIO = ~(1 << OUT_RED);
+                if (btn == short_press)
+                    state = sleep;
+                else if (btn == long_press) {
+                    state = aux_red_pulse;
+                    settings.aux = state;
+                }
+                break;
+            case aux_red_pulse:
+                if (red_pulse_cnt >= RED_PULSE_DELAY) {
+                    GPIO ^= (1 << OUT_RED);
+                    red_pulse_cnt = 0;
+                }
+                if (btn == short_press)
+                    state = sleep;
+                else if (btn == long_press) {
+                    state = aux_white;
+                    settings.aux = state;
+                }
+                break;
+            case sleep:
+                GPIO = 0xFF; // Turn off any GPIO
+                state = sleep;
+                if (GPIO); // Dummy-read GPIO before going to sleep
+                GPWUF = 0; // Reset the GPWUF flag
+                while (true)
+                    SLEEP();
+                break;
+        }
     }
 }
