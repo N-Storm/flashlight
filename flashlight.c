@@ -55,7 +55,7 @@ inline void init() {
         state = power_on;
     } else
         state = wake;
-    TRIS = (1 << IN_BTN); // IN_BTN = INPUT, reset = OUTPUT
+    TRIS = (1 << IN_BTN); // IN_BTN = INPUT, rest = OUTPUT
 }
 
 // Prepartion before going to SLEEP mode
