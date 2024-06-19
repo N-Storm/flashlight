@@ -26,7 +26,6 @@ jobs:
         wget -nv -O /tmp/picdfp.zip "https://packs.download.microchip.com/Microchip.PIC10-12Fxxx_DFP.1.7.178.atpack"
         sudo mkdir /opt/microchip/dfp
         sudo unzip /tmp/picdfp.zip -d /opt/microchip/dfp
-        sudo chmod -R o+r
         rm /tmp/xc8 /tmp/picdfp.zip
         ls -l /opt/microchip/dfp/xc8
         
