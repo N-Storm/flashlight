@@ -28,7 +28,7 @@ jobs:
     - name: Build
       run: |        
         ls -l
-        /opt/microchip/xc8/bin/xc8 -mcpu=10F200 -v -Os -maddrqual=ignore -v -mwarn=0 -Wa,-a -Wl,--data-init -mno-osccal -mresetbits -msave-resetbits -mno-download -mno-stackcall -mno-config -mno-default-config-bits -std=c90 -mc90lib -mstack=compiled:auto flashlight.c || /bin/true
+        /opt/microchip/xc8/bin/xc8 -mcpu=10F200 -chip=10F200 -v -Os -maddrqual=ignore -v -mwarn=0 -Wa,-a -Wl,--data-init -mno-osccal -mresetbits -msave-resetbits -mno-download -mno-stackcall -mno-config -mno-default-config-bits -std=c90 -mc90lib -mstack=compiled:auto flashlight.c || /bin/true
         mkdir build
-        /opt/microchip/xc8/bin/xc8 -mcpu=10F200 -v -Os -maddrqual=ignore -v -mwarn=0 -Wa,-a -Wl,--data-init -mno-osccal -mresetbits -msave-resetbits -mno-download -mno-stackcall -mno-config -mno-default-config-bits -std=c90 -mc90lib -mstack=compiled:auto -o build/flashlight.elf flashlight.c || /bin/true
+        /opt/microchip/xc8/bin/xc8 -mcpu=10F200 -chip=10F200 -v -Os -maddrqual=ignore -v -mwarn=0 -Wa,-a -Wl,--data-init -mno-osccal -mresetbits -msave-resetbits -mno-download -mno-stackcall -mno-config -mno-default-config-bits -std=c90 -mc90lib -mstack=compiled:auto -o build/flashlight.elf flashlight.c || /bin/true
         ls -l . ./build
