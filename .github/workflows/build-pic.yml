@@ -1,0 +1,27 @@
+name: Build firmware with xc8
+
+on:
+  push:
+    branches: [ "master", "red-pulse" ]
+  workflow_dispatch:
+  
+jobs:
+  build:
+
+    runs-on: ubuntu-20.04
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install deps & xc8
+      run: |
+        dpkg --add-architecture i386
+        apt update
+        apt install -y libc6:i386 libx11-6:i386 libxext6:i386 libstdc++6:i386 libexpat1:i386 libusb-1.0-0-dev wget sudo make
+        apt clean
+        apt autoremove --purge -y
+        wget -nv -O /tmp/xc8 "https://ww1.microchip.com/downloads/aemDocuments/documents/DEV/ProductDocuments/SoftwareTools/xc8-v2.40-full-install-linux-x64-installer.run" && \
+        chmod +x /tmp/xc8
+        /tmp/xc8 --mode unattended --unattendedmodeui none --netservername localhost --LicenseType FreeMode --prefix "/opt/microchip/xc8"
+        rm /tmp/xc8
+        /opt/microchip/xc8/bin/xc8
