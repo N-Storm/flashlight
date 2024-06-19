@@ -27,4 +27,4 @@ jobs:
 
     - name: Build
       run: |        
-        /opt/microchip/xc8/bin/xc8 -mcpu=10F200 -mchip=10F200 -O2 -std=C90 -o flashlight.elf flashlight.c
+        /opt/microchip/xc8/bin/xc8 -mcpu=10F200 -v -Os -maddrqual=ignore -v -mwarn=0 -Wa,-a -Wl,--data-init -mno-osccal -mresetbits -msave-resetbits -mno-download -mno-stackcall -mno-config -mno-default-config-bits -std=c90 -mc90lib -mstack=compiled:auto -o flashlight.elf  flashlight.c
