@@ -15,10 +15,11 @@
 #define IN_BTN_GP GP3
 
 //Timer0 Settings: Prescaler = 4, TMR0 count = 256 (no preload), Freq = 976.56 Hz, Period = 1024 us
-// These values are for PWM duty cycle modes for main light. Duty cycle = VALUE / 255.
-#define TMR0_PWM_VAL0 25 // ~10% for mode LOW
-#define TMR0_PWM_VAL1 77 // ~30% for mode MED
-#define TMR0_PWM_VAL2 182 // ~71% for mode HIGH
+// These values are for PWM duty cycle modes for main light. Duty cycle = RAW VALUE / 255.
+#define TMR0_ADD 14 // Busy on "other things" compensation
+#define TMR0_PWM_VAL0 25 + TMR0_ADD // ~10% for mode LOW
+#define TMR0_PWM_VAL1 77 + TMR0_ADD // ~30% for mode MED
+#define TMR0_PWM_VAL2 182 + TMR0_ADD // ~71% for mode HIGH
 
 // Delays for buttons
 // Longs press equals 0.6s (cnt divided by one timer cycle period)
@@ -32,8 +33,8 @@
 
 #define _XTAL_FREQ 4000000 // 4 MHz INTOSC
 
-typedef enum {bounce, short_press, long_press} buttons_t;
-typedef enum {power_on, sleep, wake , aux_white , aux_red, main_full, main_low = TMR0_PWM_VAL0, main_med = TMR0_PWM_VAL1, main_high = TMR0_PWM_VAL2} state_t;
+typedef enum { bounce, short_press, long_press } buttons_t;
+typedef enum { power_on, sleep, wake, aux_white, aux_red, main_full, main_low = TMR0_PWM_VAL0, main_med = TMR0_PWM_VAL1, main_high = TMR0_PWM_VAL2 } state_t;
 
 typedef struct {
     state_t main;
@@ -42,7 +43,7 @@ typedef struct {
 
 // Global vars
 state_t state;
-settings_t settings  __at(0x1A);
+settings_t settings __at(0x1A);
 buttons_t btn = bounce;
 
 inline void init() {
@@ -58,7 +59,7 @@ inline void init() {
 // Prepartion before going to SLEEP mode
 void enter_sleep() {
     GPIO = 0xFF; // Turn off any GPIO
-    state = sleep;    
+    state = sleep;
     if (GPIO); // Dummy-read GPIO before going to sleep
     GPWUF = 0; // Reset the GPWUF flag
     while (true)
@@ -83,13 +84,25 @@ void timed_step() {
             btn = short_press;
         btn_buf = 0; // reset counter when button are not pressed
     }
-    
+
     if (state >= main_low) {
         while (TMR0 < state);
         GPIO = 0xFF;
         while (TMR0 >= state);
     } else
-       while (TMR0 > 0);
+        while (TMR0 > 0);
+}
+
+void fsm_transit(state_t next_state) {
+    if (btn == short_press)
+        state = sleep;
+    else if (btn == long_press) {
+        state = next_state;
+        if (state == aux_red || state == aux_white)
+            settings.aux = state;
+        else
+            settings.main = state;
+    }
 }
 
 void fsm_routine() {
@@ -109,55 +122,25 @@ void fsm_routine() {
                 state = settings.aux;
             break;
         case main_low:
-            if (btn == short_press)
-                state = sleep;
-            else if (btn == long_press) {
-                state = main_med;
-                settings.main = state;
-            }
+            fsm_transit(main_med);
             break;
         case main_med:
-            if (btn == short_press)
-                state = sleep;
-            else if (btn == long_press) {
-                state = main_high;
-                settings.main = state;
-            }
+            fsm_transit(main_high);
             break;
         case main_high:
-            if (btn == short_press)
-                state = sleep;
-            else if (btn == long_press) {
-                state = main_full;
-                settings.main = state;
-            }
+            fsm_transit(main_full);
             break;
         case main_full:
             GPIO = ~(1 << OUT_XML);
-            if (btn == short_press)
-                state = sleep;
-            else if (btn == long_press) {
-                state = main_low;
-                settings.main = state;
-            }
+            fsm_transit(main_low);
             break;
         case aux_white:
             GPIO = ~(1 << OUT_WHITE);
-            if (btn == short_press)
-                state = sleep;
-            else if (btn == long_press) {
-                state = aux_red;
-                settings.aux = state;
-            }
+            fsm_transit(aux_red);
             break;
         case aux_red:
             GPIO = ~(1 << OUT_RED);
-            if (btn == short_press)
-                state = sleep;
-            else if (btn == long_press) {
-                state = aux_white;
-                settings.aux = state;
-            }
+            fsm_transit(aux_white);
             break;
         case sleep:
             enter_sleep();
