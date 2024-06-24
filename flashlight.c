@@ -14,24 +14,15 @@
 #define IN_BTN 3 // GP3
 #define IN_BTN_GP GP3
 
-//Timer0 Settings: Prescaler = 4, TMR0 count = 250, Freq = 1000 Hz, Period = 1 ms
-// Soft PWM preload values for timer, affects PWM frequency
-// #define TMR0_CNT 250
-// #define TMR0_PRELOAD 256 - TMR0_CNT
-// These values are for PWM modes duty cycle. While one are used as HIGH level period other are used low for LOW mode
-// and vice-versa for othermode, resulting in 33% / 66% duty cycle for LOW / MED modes.
-// #define TMR0_PWM_VAL0 (const uint8_t)(256 - ((TMR0_CNT) * 0.34)) // 34% 85
-// #define TMR0_PWM_VAL1 (const uint8_t)(256 - ((TMR0_CNT) * 0.66)) // 66% 165
-// #define TMR0_PWM_VAL0 (const uint8_t)(256 - ((TMR0_CNT) * 0.3) + 2 ) // 30% 75 + adjust
-// #define TMR0_PWM_VAL1 (const uint8_t)(256 - ((TMR0_CNT) * 0.7) + 12) // 70% 175 + adjust
-#define TMR0_PWM_VAL0 25
-#define TMR0_PWM_VAL1 77
-#define TMR0_PWM_VAL2 182
-
+//Timer0 Settings: Prescaler = 4, TMR0 count = 256 (no preload), Freq = 976.56 Hz, Period = 1024 us
+// These values are for PWM duty cycle modes for main light. Duty cycle = VALUE / 255.
+#define TMR0_PWM_VAL0 25 // ~10% for mode LOW
+#define TMR0_PWM_VAL1 77 // ~30% for mode MED
+#define TMR0_PWM_VAL2 182 // ~71% for mode HIGH
 
 // Delays for buttons
 // Longs press equals 0.6s (cnt divided by one timer cycle period)
-#define BTN_BUF_DELAY_CNT (const uint16_t)(0.6*1000)
+#define BTN_BUF_DELAY_CNT (const uint16_t)(0.6*976.56)
 #define BTN_BUF_DEBOUNCE_CNT 15
 
 #include <xc.h>
@@ -42,7 +33,7 @@
 #define _XTAL_FREQ 4000000 // 4 MHz INTOSC
 
 typedef enum {bounce, short_press, long_press} buttons_t;
-typedef enum {power_on, sleep, wake = TMR0_PWM_VAL0 - 3, aux_white = TMR0_PWM_VAL0 - 2 , aux_red = TMR0_PWM_VAL0 - 1, main_low = TMR0_PWM_VAL0, main_med = TMR0_PWM_VAL1, main_high = TMR0_PWM_VAL2, main_full = TMR0_PWM_VAL0 - 4} state_t;
+typedef enum {power_on, sleep, wake , aux_white , aux_red, main_full, main_low = TMR0_PWM_VAL0, main_med = TMR0_PWM_VAL1, main_high = TMR0_PWM_VAL2} state_t;
 
 typedef struct {
     state_t main;
@@ -93,8 +84,8 @@ void timed_step() {
         btn_buf = 0; // reset counter when button are not pressed
     }
     
-    while (TMR0 < state);
     if (state >= main_low) {
+        while (TMR0 < state);
         GPIO = 0xFF;
         while (TMR0 >= state);
     } else
